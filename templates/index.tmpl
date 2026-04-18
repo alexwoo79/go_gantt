@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+  {{if .HasChart}}
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/theme/dark.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/theme/vintage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/theme/macarons.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/theme/shine.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/theme/roma.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/theme/infographic.js"></script>
+  {{end}}
+</head>
+<body class="app-body">
+  <div class="workspace {{if .DatasetID}}with-data{{end}}" id="workspaceRoot">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <h1>甘特图工作台</h1>
+        <button type="button" id="toggleSidebar" class="icon-btn btn btn-outline-primary btn-sm" aria-label="收起边栏"><i class="bi bi-chevron-left"></i></button>
+      </div>
+
+      <div class="demo-toggle-wrap">
+        {{if eq .FileName "demo.csv"}}
+        <a class="demo-toggle-btn demo-loaded" href="/clear" title="取消演示数据，清空当前内容">
+          <i class="bi bi-x-circle"></i>
+          <span>取消演示数据</span>
+        </a>
+        {{else if .FileName}}
+        <a class="demo-toggle-btn demo-active" href="/demo" title="当前已有数据，点击切换为演示数据">
+          <i class="bi bi-arrow-repeat"></i>
+          <span>切换演示数据</span>
+        </a>
+        {{else}}
+        <a class="demo-toggle-btn" href="/demo" title="加载内置演示数据">
+          <i class="bi bi-play-circle"></i>
+          <span>使用演示数据</span>
+        </a>
+        {{end}}
+      </div>
+
+      <section class="side-card">
+        <h2>数据源</h2>
+        <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+          <input class="form-control form-control-sm" type="file" name="data_file" accept=".csv,.xlsx,.xlsm,.xltx,.xltm" required />
+          <button class="btn btn-primary w-100" type="submit">上传文件</button>
+        </form>
+        <p class="hint">上传后在下方配置列映射，再生成甘特图。</p>
+        {{if .FileName}}<p class="hint">当前数据：{{.FileName}}</p>{{end}}
+        {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+      </section>
+
+      {{if .DatasetID}}
+      <section class="side-card">
+        <h2>列映射与参数</h2>
+        <form action="/chart" method="post" class="mapping-form">
+          <input type="hidden" name="dataset_id" value="{{.DatasetID}}" />
+
+          <label>任务列(必填)
+            <select class="form-select form-select-sm" name="task_col" required>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.TaskCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>开始日期列(必填)
+            <select class="form-select form-select-sm" name="start_col" required>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.StartCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>结束日期列(必填)
+            <select class="form-select form-select-sm" name="end_col" required>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.EndCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>项目列(可选)
+            <select class="form-select form-select-sm" name="project_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.ProjectCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>颜色分组列(可选)
+            <select class="form-select form-select-sm" name="color_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.ColorCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>任务描述列(可选)
+            <select class="form-select form-select-sm" name="desc_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.DescCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>里程碑名称列(可选)
+            <select class="form-select form-select-sm" name="milestone_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.MilestoneCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>里程碑日期列(可选)
+            <select class="form-select form-select-sm" name="milestone_date_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.MilestoneDateCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>计划开始列(可选)
+            <select class="form-select form-select-sm" name="plan_start_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.PlanStartCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>计划结束列(可选)
+            <select class="form-select form-select-sm" name="plan_end_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.PlanEndCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>负责人列(可选)
+            <select class="form-select form-select-sm" name="owner_col">
+              <option value="">(不使用)</option>
+              {{range .Headers}}
+              <option value="{{.}}" {{if eq $.Mapping.OwnerCol .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </label>
+
+          <label>时间粒度
+            <select class="form-select form-select-sm" name="time_granularity">
+              <option value="day" {{if eq .Options.TimeGranularity "day"}}selected{{end}}>日</option>
+              <option value="week" {{if eq .Options.TimeGranularity "week"}}selected{{end}}>周</option>
+              <option value="month" {{if eq .Options.TimeGranularity "month"}}selected{{end}}>月</option>
+              <option value="quarter" {{if eq .Options.TimeGranularity "quarter"}}selected{{end}}>季度</option>
+              <option value="year" {{if eq .Options.TimeGranularity "year"}}selected{{end}}>年</option>
+            </select>
+          </label>
+
+          <label>ECharts 主题
+            <select class="form-select form-select-sm" name="chart_theme">
+              <option value="default" {{if or (eq .Options.ChartTheme "") (eq .Options.ChartTheme "default")}}selected{{end}}>默认</option>
+              <option value="macarons" {{if eq .Options.ChartTheme "macarons"}}selected{{end}}>Macarons</option>
+              <option value="infographic" {{if eq .Options.ChartTheme "infographic"}}selected{{end}}>Infographic</option>
+              <option value="shine" {{if eq .Options.ChartTheme "shine"}}selected{{end}}>Shine</option>
+              <option value="roma" {{if eq .Options.ChartTheme "roma"}}selected{{end}}>Roma</option>
+              <option value="vintage" {{if eq .Options.ChartTheme "vintage"}}selected{{end}}>Vintage</option>
+              <option value="dark" {{if eq .Options.ChartTheme "dark"}}selected{{end}}>Dark</option>
+            </select>
+          </label>
+
+          <div class="checks">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk_details" name="show_task_details" {{if .Options.ShowTaskDetails}}checked{{end}} />
+              <label class="form-check-label" for="chk_details">显示任务详情</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk_duration" name="show_duration" {{if .Options.ShowDuration}}checked{{end}} />
+              <label class="form-check-label" for="chk_duration">显示周期</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk_sort" name="sort_by_start" {{if .Mapping.SortByStart}}checked{{end}} />
+              <label class="form-check-label" for="chk_sort">按开始时间排序</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk_num" name="show_task_number" {{if .Mapping.ShowTaskNumber}}checked{{end}} />
+              <label class="form-check-label" for="chk_num">自动编号</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk_dark" name="dark_theme" {{if .Options.DarkTheme}}checked{{end}} />
+              <label class="form-check-label" for="chk_dark">深色主题</label>
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-100 mt-1" type="submit">生成甘特图</button>
+        </form>
+      </section>
+      {{end}}
+    </aside>
+
+    <main class="content">
+      <header class="content-head">
+        <h2>结果面板</h2>
+        <p>{{if .DatasetID}}右侧包含数据表和甘特图，可展开或收起。{{else}}先在左侧上传数据并选择列映射。{{end}}</p>
+      </header>
+
+      {{if .DatasetID}}
+      <details class="panel mt-3" {{if not .HasChart}}open{{end}}>
+        <summary class="text-secondary fw-semibold"><i class="bi bi-table me-1"></i>数据预览 <small class="text-muted">(可收回)</small></summary>
+        <div class="table-wrap mt-2">
+          <table class="table table-sm table-bordered table-striped table-hover align-middle mb-0">
+            <thead class="table-primary">
+              <tr>
+                {{range .Headers}}<th>{{.}}</th>{{end}}
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Preview}}
+              <tr>
+                {{range .}}<td>{{.}}</td>{{end}}
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {{end}}
+
+      {{if .HasChart}}
+      <div class="metrics-grid mt-3">
+        <div class="card metric-card border-0 shadow-sm">
+          <div class="card-body py-2 px-3">
+            <div class="metric-label"><i class="bi bi-list-task text-primary me-1"></i>总任务数</div>
+            <div class="metric-value" id="mTaskCount">0</div>
+          </div>
+        </div>
+        <div class="card metric-card border-0 shadow-sm">
+          <div class="card-body py-2 px-3">
+            <div class="metric-label"><i class="bi bi-clock text-info me-1"></i>平均周期(天)</div>
+            <div class="metric-value" id="mAvg">0</div>
+          </div>
+        </div>
+        <div class="card metric-card border-0 shadow-sm">
+          <div class="card-body py-2 px-3">
+            <div class="metric-label"><i class="bi bi-calendar-range text-success me-1"></i>总工期(天)</div>
+            <div class="metric-value" id="mTotal">0</div>
+          </div>
+        </div>
+        <div class="card metric-card border-0 shadow-sm" id="mPlanTotalWrap" style="display:none;">
+          <div class="card-body py-2 px-3">
+            <div class="metric-label"><i class="bi bi-calendar2-check text-warning me-1"></i>计划总工期(天)</div>
+            <div class="metric-value" id="mPlanTotal">0</div>
+          </div>
+        </div>
+        <div class="card metric-card border-0 shadow-sm">
+          <div class="card-body py-2 px-3">
+            <div class="metric-label"><i class="bi bi-trophy text-danger me-1"></i>最长周期(天)</div>
+            <div class="metric-value" id="mMax">0</div>
+          </div>
+        </div>
+      </div>
+
+      <section class="panel mt-3" id="ganttPanel">
+        <div class="d-flex align-items-center mb-1 gap-2">
+          <h3 class="mb-0 flex-grow-1"><i class="bi bi-bar-chart-line me-1"></i>任务甘特图</h3>
+          <button id="btnFullscreen" class="btn-fs-overlay" title="全屏查看">
+            <i class="bi bi-fullscreen" id="fsIcon"></i>
+          </button>
+        </div>
+        <div id="gantt" class="chart chart-lg"></div>
+      </section>
+
+      <script>
+        window.GANTT_DATA = {
+          tasks: {{.TasksJSON}},
+          stats: {{.StatsJSON}},
+          options: {{.OptionsJSON}}
+        };
+      </script>
+      <script src="/static/chart.js"></script>
+      {{end}}
+    </main>
+  </div>
+
+  <script>
+    /* ── 全屏控制 ──────────────────────────────────────── */
+    (function () {
+      var panel = document.getElementById("ganttPanel");
+      var btn   = document.getElementById("btnFullscreen");
+      var icon  = document.getElementById("fsIcon");
+      if (!panel || !btn) return;
+
+      function updateIcon() {
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+        icon.className = isFs ? "bi bi-fullscreen-exit" : "bi bi-fullscreen";
+        btn.title = isFs ? "退出全屏" : "全屏查看";
+        /* 通知 ECharts 重新适应尺寸 */
+        setTimeout(function () { window.dispatchEvent(new Event("resize")); }, 80);
+      }
+
+      btn.addEventListener("click", function () {
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+        if (!isFs) {
+          (panel.requestFullscreen || panel.webkitRequestFullscreen || panel.mozRequestFullScreen).call(panel);
+        } else {
+          (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document);
+        }
+      });
+
+      document.addEventListener("fullscreenchange", updateIcon);
+      document.addEventListener("webkitfullscreenchange", updateIcon);
+      document.addEventListener("mozfullscreenchange", updateIcon);
+    })();
+  </script>
+
+  <script>
+    (function () {
+      const root = document.getElementById("workspaceRoot");
+      const btn = document.getElementById("toggleSidebar");
+      if (!root || !btn) return;
+
+      const key = "gantt.sidebar.collapsed";
+      if (localStorage.getItem(key) === "1") {
+        root.classList.add("sidebar-collapsed");
+        btn.innerHTML = '<i class="bi bi-chevron-right"></i>';
+        window.dispatchEvent(new Event("resize"));
+        setTimeout(function () {
+          window.dispatchEvent(new Event("resize"));
+        }, 80);
+      }
+
+      btn.addEventListener("click", function () {
+        const collapsed = root.classList.toggle("sidebar-collapsed");
+        btn.innerHTML = collapsed ? '<i class="bi bi-chevron-right"></i>' : '<i class="bi bi-chevron-left"></i>';
+        localStorage.setItem(key, collapsed ? "1" : "0");
+        window.dispatchEvent(new Event("resize"));
+        setTimeout(function () {
+          window.dispatchEvent(new Event("resize"));
+        }, 80);
+      });
+    })();
+  </script>
+</body>
+</html>

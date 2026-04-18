@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero compact">
+      <h1>甘特图结果</h1>
+      <p>数据集：{{.DatasetName}}</p>
+      <a class="link-btn" href="/">返回上传与映射</a>
+    </header>
+
+    <section class="panel metrics-grid">
+      <article class="metric"><h3>总任务数</h3><p id="mTaskCount">0</p></article>
+      <article class="metric"><h3>平均周期(天)</h3><p id="mAvg">0</p></article>
+      <article class="metric"><h3>总周期(天)</h3><p id="mTotal">0</p></article>
+      <article class="metric"><h3>最长周期(天)</h3><p id="mMax">0</p></article>
+    </section>
+
+    <section class="panel">
+      <h2>任务甘特图</h2>
+      <div id="gantt" class="chart chart-lg"></div>
+    </section>
+
+    <section class="panel" id="summaryPanel">
+      <h2>项目汇总图</h2>
+      <div id="summary" class="chart chart-sm"></div>
+    </section>
+  </div>
+
+  <script>
+    window.GANTT_DATA = {
+      tasks: {{.TasksJSON}},
+      stats: {{.StatsJSON}},
+      options: {{.OptionsJSON}}
+    };
+  </script>
+  <script src="/static/chart.js"></script>
+</body>
+</html>
