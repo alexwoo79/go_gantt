@@ -44,6 +44,14 @@ type Config struct {
 	NodeValueCol    string
 }
 
+// HierarchyValidation summarizes hierarchy mapping/data checks for tree-like charts.
+type HierarchyValidation struct {
+	OK       bool           `json:"ok"`
+	Errors   []string       `json:"errors"`
+	Warnings []string       `json:"warnings"`
+	Stats    map[string]int `json:"stats"`
+}
+
 // Definition describes a visual builder for the UI.
 type Definition struct {
 	Kind        string
@@ -758,6 +766,11 @@ func buildRelation(dataset model.Dataset, cfg Config) (map[string]any, error) {
 }
 
 func buildHierarchy(dataset model.Dataset, cfg Config) (map[string]any, error) {
+	validation := ValidateHierarchy(dataset, cfg)
+	if len(validation.Errors) > 0 {
+		return nil, fmt.Errorf("%s", strings.Join(validation.Errors, "；"))
+	}
+
 	index := headerIndex(dataset.Headers)
 	nodeIDIdx := idx(index, cfg.NodeIDCol)
 	parentIDIdx := idx(index, cfg.ParentIDCol)
@@ -768,6 +781,9 @@ func buildHierarchy(dataset model.Dataset, cfg Config) (map[string]any, error) {
 	}
 	if nodeIDIdx < 0 || parentIDIdx < 0 {
 		return nil, fmt.Errorf("请为该图形选择节点ID列与父节点列")
+	}
+	if nodeIDIdx == parentIDIdx {
+		return nil, fmt.Errorf("节点ID列与父节点列不能相同，否则会形成自循环")
 	}
 	type treeNode struct {
 		ID       string
@@ -791,6 +807,9 @@ func buildHierarchy(dataset model.Dataset, cfg Config) (map[string]any, error) {
 			id = fmt.Sprintf("node-%d", i+1)
 		}
 		parent := strings.TrimSpace(data.Cell(row, parentIDIdx))
+		if parent == id {
+			return nil, fmt.Errorf("第 %d 行节点ID与父节点相同（%s），请修正映射或数据", i+1, id)
+		}
 		name := ""
 		if nameIdx >= 0 {
 			name = strings.TrimSpace(data.Cell(row, nameIdx))
@@ -822,8 +841,14 @@ func buildHierarchy(dataset model.Dataset, cfg Config) (map[string]any, error) {
 		}
 		delete(roots, id)
 	}
-	var toPayload func(n *treeNode) map[string]any
-	toPayload = func(n *treeNode) map[string]any {
+	var toPayload func(n *treeNode, stack map[string]bool) (map[string]any, error)
+	toPayload = func(n *treeNode, stack map[string]bool) (map[string]any, error) {
+		if stack[n.ID] {
+			return nil, fmt.Errorf("检测到循环父子关系，节点ID: %s", n.ID)
+		}
+		stack[n.ID] = true
+		defer delete(stack, n.ID)
+
 		out := map[string]any{"name": n.Name}
 		if n.Value != 0 {
 			out["value"] = n.Value
@@ -831,19 +856,31 @@ func buildHierarchy(dataset model.Dataset, cfg Config) (map[string]any, error) {
 		if len(n.Children) > 0 {
 			children := make([]map[string]any, 0, len(n.Children))
 			for _, ch := range n.Children {
-				children = append(children, toPayload(ch))
+				child, err := toPayload(ch, stack)
+				if err != nil {
+					return nil, err
+				}
+				children = append(children, child)
 			}
 			out["children"] = children
 		}
-		return out
+		return out, nil
 	}
 	rootNodes := make([]map[string]any, 0)
 	for _, n := range roots {
-		rootNodes = append(rootNodes, toPayload(n))
+		payloadNode, err := toPayload(n, map[string]bool{})
+		if err != nil {
+			return nil, err
+		}
+		rootNodes = append(rootNodes, payloadNode)
 	}
 	if len(rootNodes) == 0 {
 		for _, n := range nodesByID {
-			rootNodes = append(rootNodes, toPayload(n))
+			payloadNode, err := toPayload(n, map[string]bool{})
+			if err != nil {
+				return nil, err
+			}
+			rootNodes = append(rootNodes, payloadNode)
 		}
 	}
 	if len(rootNodes) == 0 {
@@ -859,6 +896,132 @@ func buildHierarchy(dataset model.Dataset, cfg Config) (map[string]any, error) {
 		"seriesName": cfg.SeriesName,
 		"tree":       root,
 	}, nil
+}
+
+// ValidateHierarchy checks tree/treemap mapping consistency and basic topology issues.
+func ValidateHierarchy(dataset model.Dataset, cfg Config) HierarchyValidation {
+	res := HierarchyValidation{
+		OK:       true,
+		Errors:   []string{},
+		Warnings: []string{},
+		Stats:    map[string]int{},
+	}
+
+	index := headerIndex(dataset.Headers)
+	nodeIDIdx := idx(index, cfg.NodeIDCol)
+	parentIDIdx := idx(index, cfg.ParentIDCol)
+	nameIdx := idx(index, cfg.NameCol)
+	if nodeIDIdx < 0 {
+		nodeIDIdx = nameIdx
+	}
+	if nodeIDIdx < 0 || parentIDIdx < 0 {
+		res.OK = false
+		res.Errors = append(res.Errors, "请为该图形选择节点ID列与父节点列")
+		return res
+	}
+	if nodeIDIdx == parentIDIdx {
+		res.OK = false
+		res.Errors = append(res.Errors, "节点ID列与父节点列不能相同，否则会形成自循环")
+		return res
+	}
+
+	type edgeRow struct {
+		line   int
+		nodeID string
+		parent string
+	}
+
+	idRows := map[string][]int{}
+	parentRefs := map[string][]int{}
+	edges := make([]edgeRow, 0, len(dataset.Rows))
+	parentByChild := map[string]string{}
+
+	for i, row := range dataset.Rows {
+		lineNo := i + 2
+		id := strings.TrimSpace(data.Cell(row, nodeIDIdx))
+		if id == "" {
+			id = fmt.Sprintf("node-%d", i+1)
+			res.Warnings = append(res.Warnings, fmt.Sprintf("第 %d 行节点ID为空，已使用自动ID: %s", lineNo, id))
+		}
+		parent := strings.TrimSpace(data.Cell(row, parentIDIdx))
+		if parent == id && parent != "" {
+			res.Errors = append(res.Errors, fmt.Sprintf("第 %d 行节点ID与父节点相同（%s）", lineNo, id))
+		}
+
+		idRows[id] = append(idRows[id], lineNo)
+		if parent != "" {
+			parentRefs[parent] = append(parentRefs[parent], lineNo)
+		}
+		edges = append(edges, edgeRow{line: lineNo, nodeID: id, parent: parent})
+
+		if parent != "" {
+			if existed, ok := parentByChild[id]; ok && existed != parent {
+				res.Errors = append(res.Errors, fmt.Sprintf("第 %d 行节点 %s 的父节点与前序记录冲突（%s vs %s）", lineNo, id, existed, parent))
+			} else {
+				parentByChild[id] = parent
+			}
+		}
+	}
+
+	if len(edges) == 0 {
+		res.Errors = append(res.Errors, "未解析到树结构数据")
+	}
+
+	for id, lines := range idRows {
+		if len(lines) > 1 {
+			res.Warnings = append(res.Warnings, fmt.Sprintf("节点ID %s 在多行重复出现（行: %v），会被合并为同一节点", id, lines))
+		}
+	}
+
+	orphanCount := 0
+	for parentID, lines := range parentRefs {
+		if _, ok := idRows[parentID]; ok {
+			continue
+		}
+		orphanCount++
+		res.Warnings = append(res.Warnings, fmt.Sprintf("父节点 %s 未作为节点出现（引用行: %v），将被视为隐式父节点", parentID, lines))
+	}
+
+	// Detect cycle path by following each node's parent chain.
+	seenCycles := map[string]bool{}
+	for child := range parentByChild {
+		pathIndex := map[string]int{}
+		path := make([]string, 0, 8)
+		cur := child
+		for cur != "" {
+			if start, ok := pathIndex[cur]; ok {
+				cycle := append(append([]string{}, path[start:]...), cur)
+				key := strings.Join(cycle, "->")
+				if !seenCycles[key] {
+					seenCycles[key] = true
+					res.Errors = append(res.Errors, fmt.Sprintf("检测到循环父子关系: %s", strings.Join(cycle, " -> ")))
+				}
+				break
+			}
+			pathIndex[cur] = len(path)
+			path = append(path, cur)
+			next, ok := parentByChild[cur]
+			if !ok {
+				break
+			}
+			cur = next
+		}
+	}
+
+	roots := 0
+	for id := range idRows {
+		parent, ok := parentByChild[id]
+		if !ok || parent == "" {
+			roots++
+		}
+	}
+
+	res.Stats["rows"] = len(edges)
+	res.Stats["nodes"] = len(idRows)
+	res.Stats["roots"] = roots
+	res.Stats["orphans"] = orphanCount
+	res.OK = len(res.Errors) == 0
+	return res
 }
 
 // Build creates a payload with the builder selected by chart kind.

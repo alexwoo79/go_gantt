@@ -326,6 +326,16 @@
                     {{end}}
                   </select>
                 </label>
+
+                <div class="hierarchy-check" id="hierarchyCheckPanel">
+                  <div class="hierarchy-check-actions">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="hierarchyCheckBtn">
+                      <i class="bi bi-shield-check me-1"></i>检查层级数据
+                    </button>
+                    <span class="hint">用于树图/矩形树图，检查循环父子、孤儿节点、重复ID</span>
+                  </div>
+                  <div class="hierarchy-check-result" id="hierarchyCheckResult" style="display:none;"></div>
+                </div>
               </div>
 
               </details>
@@ -365,17 +375,14 @@
         <a class="btn btn-outline-secondary btn-sm page-entry-btn" href="/" title="返回工具入口">入口</a>
       </header>
 
-      <section class="panel mt-3 viz-guide-panel" id="vizGuidePanel">
-        <div class="panel-title-row mb-3 gap-2">
-          <div class="panel-head-main flex-grow-1">
-            <h3 class="panel-title mb-0"><i class="bi bi-grid-3x3-gap me-1"></i>图形说明</h3>
-            <p class="panel-subtitle mb-0">点击卡片可直接切换图形类型，并与左侧图形类型选择保持同步。</p>
-          </div>
-          <button type="button" class="btn btn-outline-secondary btn-sm viz-guide-toggle" id="toggleGuideCards" aria-expanded="true">
-            <i class="bi bi-arrows-collapse"></i>
-            <span>收起卡片</span>
-          </button>
-        </div>
+      <details class="panel mt-3 viz-guide-panel" id="vizGuidePanel" open>
+        <summary class="panel-summary">
+          <span class="panel-head-main">
+            <span class="panel-summary-title"><i class="bi bi-grid-3x3-gap me-1"></i>图形说明</span>
+            <span class="panel-summary-subtitle">点击卡片可直接切换图形类型，并与左侧图形类型保持同步</span>
+          </span>
+          <small class="panel-summary-note">可收回</small>
+        </summary>
         <div class="viz-guide-grid" id="vizGuideGrid">
           {{range .VizDefs}}
           <article class="viz-guide-card" data-kind="{{.Kind}}" role="button" tabindex="0" aria-pressed="false">
@@ -388,7 +395,7 @@
           </article>
           {{end}}
         </div>
-      </section>
+      </details>
 
       {{if .DatasetID}}
       <details class="panel mt-3" {{if not .HasChart}}open{{end}}>
@@ -480,25 +487,157 @@
       var yMetricCountSelect = document.getElementById('y_metric_count');
       var dynamicYFields = document.getElementById('dynamic_y_fields');
       var guidePanel = document.getElementById('vizGuidePanel');
-      var guideGrid = document.getElementById('vizGuideGrid');
-      var guideToggleBtn = document.getElementById('toggleGuideCards');
       var guideCards = document.querySelectorAll('.viz-guide-card');
-      var guideStorageKey = 'viz-guide-collapsed';
+      var guideStorageKey = 'viz-guide.open';
       var yExtraColsStorageKey = 'viz-y-extra-cols-selection';
+      var chartSketchByKind = {
+        bar: '/static/echarts_sidebar_icons/bar.svg',
+        stack_bar: '/static/echarts_sidebar_icons/bar.svg',
+        line: '/static/echarts_sidebar_icons/line.svg',
+        area: '/static/echarts_sidebar_icons/line.svg',
+        stack_area: '/static/echarts_sidebar_icons/line.svg',
+        scatter: '/static/echarts_sidebar_icons/scatter.svg',
+        pie: '/static/echarts_sidebar_icons/pie.svg',
+        donut: '/static/echarts_sidebar_icons/pie.svg',
+        funnel: '/static/echarts_sidebar_icons/funnel.svg',
+        radar: '/static/echarts_sidebar_icons/radar.svg',
+        gauge: '/static/echarts_sidebar_icons/gauge.svg',
+        sankey: '/static/echarts_sidebar_icons/sankey.svg',
+        graph: '/static/echarts_sidebar_icons/graph.svg',
+        chord: '/static/echarts_sidebar_icons/chord.svg',
+        tree: '/static/echarts_sidebar_icons/tree.svg',
+        treemap: '/static/echarts_sidebar_icons/treemap.svg'
+      };
+      var hierarchyCheckPanel = document.getElementById('hierarchyCheckPanel');
+      var hierarchyCheckBtn = document.getElementById('hierarchyCheckBtn');
+      var hierarchyCheckResult = document.getElementById('hierarchyCheckResult');
+      var mappingForm = document.querySelector('form.mapping-form');
 
-      function setGuideCollapsed(collapsed) {
-        if (!guidePanel || !guideToggleBtn || !guideGrid) return;
-        guidePanel.classList.toggle('is-collapsed', collapsed);
-        guideGrid.style.display = collapsed ? 'none' : 'grid';
-        guideToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-        guideToggleBtn.innerHTML = collapsed
-          ? '<i class="bi bi-arrows-expand"></i><span>展开卡片</span>'
-          : '<i class="bi bi-arrows-collapse"></i><span>收起卡片</span>';
-        try {
-          window.localStorage.setItem(guideStorageKey, collapsed ? '1' : '0');
-        } catch (e) {
-          // ignore storage errors (private mode / quota)
+      function isHierarchyKind(kind) {
+        return kind === 'tree' || kind === 'treemap';
+      }
+
+      function escapeHtml(text) {
+        return String(text == null ? '' : text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function renderHierarchyCheckResult(payload) {
+        if (!hierarchyCheckResult) return;
+        var errors = (payload && payload.errors) || [];
+        var warnings = (payload && payload.warnings) || [];
+        var stats = (payload && payload.stats) || {};
+        var ok = !!(payload && payload.ok);
+
+        var html = '<div class="check-head ' + (ok ? 'is-ok' : 'is-bad') + '">'
+          + (ok ? '层级检查通过' : '层级检查发现问题') + '</div>';
+
+        html += '<div class="check-meta">'
+          + '节点: ' + (stats.nodes || 0)
+          + ' · 根节点: ' + (stats.roots || 0)
+          + ' · 孤儿父节点: ' + (stats.orphans || 0)
+          + '</div>';
+
+        if (errors.length) {
+          html += '<div class="check-section"><strong>错误</strong><ul>';
+          errors.forEach(function (msg) {
+            html += '<li>' + escapeHtml(msg) + '</li>';
+          });
+          html += '</ul></div>';
         }
+
+        if (warnings.length) {
+          html += '<div class="check-section"><strong>提醒</strong><ul>';
+          warnings.forEach(function (msg) {
+            html += '<li>' + escapeHtml(msg) + '</li>';
+          });
+          html += '</ul></div>';
+        }
+
+        hierarchyCheckResult.innerHTML = html;
+        hierarchyCheckResult.style.display = '';
+        hierarchyCheckResult.classList.toggle('is-ok', ok);
+        hierarchyCheckResult.classList.toggle('is-bad', !ok);
+      }
+
+      function clearHierarchyCheckResult() {
+        if (!hierarchyCheckResult) return;
+        hierarchyCheckResult.innerHTML = '';
+        hierarchyCheckResult.style.display = 'none';
+        hierarchyCheckResult.classList.remove('is-ok');
+        hierarchyCheckResult.classList.remove('is-bad');
+      }
+
+      function runHierarchyCheck() {
+        if (!mappingForm) return;
+        var datasetIdEl = mappingForm.querySelector('[name="dataset_id"]');
+        if (!datasetIdEl || !datasetIdEl.value) {
+          renderHierarchyCheckResult({ ok: false, errors: ['缺少 dataset_id，请重新上传数据。'], warnings: [], stats: {} });
+          return;
+        }
+
+        var formData = new FormData(mappingForm);
+        var params = new URLSearchParams();
+        ['dataset_id', 'chart_kind', 'node_id_col', 'parent_id_col', 'name_col', 'node_value_col'].forEach(function (key) {
+          params.append(key, formData.get(key) || '');
+        });
+
+        hierarchyCheckBtn.disabled = true;
+        hierarchyCheckBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>检查中...';
+        fetch('/viz/validate-hierarchy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: params.toString()
+        }).then(function (resp) {
+          return resp.json();
+        }).then(function (payload) {
+          renderHierarchyCheckResult(payload || { ok: false, errors: ['检查失败，请稍后重试。'], warnings: [], stats: {} });
+        }).catch(function () {
+          renderHierarchyCheckResult({ ok: false, errors: ['检查请求失败，请确认服务正常运行。'], warnings: [], stats: {} });
+        }).finally(function () {
+          hierarchyCheckBtn.disabled = false;
+          hierarchyCheckBtn.innerHTML = '<i class="bi bi-shield-check me-1"></i>检查层级数据';
+        });
+      }
+
+      function initGuideOpenState() {
+        if (!guidePanel) return;
+        try {
+          var raw = window.localStorage.getItem(guideStorageKey);
+          if (raw !== null) guidePanel.open = raw === '1';
+        } catch (e) {
+          // ignore storage errors
+        }
+      }
+
+      function persistGuideOpenState() {
+        if (!guidePanel) return;
+        try {
+          window.localStorage.setItem(guideStorageKey, guidePanel.open ? '1' : '0');
+        } catch (e) {
+          // ignore storage errors
+        }
+      }
+
+      function applyGuideCardSketches() {
+        Array.prototype.forEach.call(guideCards, function (card) {
+          var kind = card.getAttribute('data-kind') || '';
+          var src = chartSketchByKind[kind];
+          if (!src) return;
+          if (card.querySelector('.viz-guide-sketch')) return;
+
+          var img = document.createElement('img');
+          img.className = 'viz-guide-sketch';
+          img.src = src;
+          img.alt = kind + ' sketch';
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          card.appendChild(img);
+        });
       }
 
       function activateKindByCard(kind) {
@@ -511,18 +650,9 @@
         syncMappingBlocks();
       }
 
-      if (guideToggleBtn) {
-        guideToggleBtn.addEventListener('click', function () {
-          var collapsed = guidePanel && guidePanel.classList.contains('is-collapsed');
-          setGuideCollapsed(!collapsed);
-        });
-      }
-
-      try {
-        var savedCollapsed = window.localStorage.getItem(guideStorageKey) === '1';
-        setGuideCollapsed(savedCollapsed);
-      } catch (e) {
-        setGuideCollapsed(false);
+      initGuideOpenState();
+      if (guidePanel) {
+        guidePanel.addEventListener('toggle', persistGuideOpenState);
       }
 
       Array.prototype.forEach.call(guideCards, function (card) {
@@ -535,6 +665,8 @@
           activateKindByCard(card.getAttribute('data-kind'));
         });
       });
+
+      applyGuideCardSketches();
 
       if (!kindSelect || !xyGroup || !pieGroup || !relationGroup) return;
 
@@ -877,6 +1009,13 @@
 
         renderFieldGuide(rule.required, rule.optional.concat(alwaysVisible));
 
+        if (hierarchyCheckPanel) {
+          hierarchyCheckPanel.style.display = isHierarchyKind(kind) ? '' : 'none';
+        }
+        if (!isHierarchyKind(kind)) {
+          clearHierarchyCheckResult();
+        }
+
         Array.prototype.forEach.call(guideCards, function (card) {
           var active = card.getAttribute('data-kind') === kind;
           card.classList.toggle('is-active', active);
@@ -902,10 +1041,32 @@
         });
       }
 
+      if (hierarchyCheckBtn) {
+        hierarchyCheckBtn.addEventListener('click', runHierarchyCheck);
+      }
+
+      ['node_id_col', 'parent_id_col', 'name_col', 'node_value_col', 'chart_kind'].forEach(function (name) {
+        var el = document.querySelector('[name="' + name + '"]');
+        if (!el) return;
+        el.addEventListener('change', clearHierarchyCheckResult);
+      });
+
       // Clear extra Y cols storage on form submit
-      var mappingForm = document.querySelector('form.mapping-form');
       if (mappingForm) {
-        mappingForm.addEventListener('submit', function () {
+        mappingForm.addEventListener('submit', function (e) {
+          var kind = kindSelect ? kindSelect.value : '';
+          if (kind === 'tree' || kind === 'treemap') {
+            var nodeIdEl = document.querySelector('[name="node_id_col"]');
+            var parentIdEl = document.querySelector('[name="parent_id_col"]');
+            var nodeIdVal = nodeIdEl ? (nodeIdEl.value || '').trim() : '';
+            var parentIdVal = parentIdEl ? (parentIdEl.value || '').trim() : '';
+            if (nodeIdVal && parentIdVal && nodeIdVal === parentIdVal) {
+              e.preventDefault();
+              alert('节点ID列与父节点列不能相同，否则会形成自循环。');
+              return;
+            }
+          }
+
           try {
             window.localStorage.removeItem(yExtraColsStorageKey);
           } catch (e) {

@@ -691,19 +691,41 @@
         const type = kind === "bar" || kind === "stack_bar" ? "bar" : "line";
         const isHorizontalBar = (kind === "bar" || kind === "stack_bar") && payload.swapAxis === true;
         if (isHorizontalBar) {
-            baseOption.xAxis = { type: "value" };
+            baseOption.xAxis = {
+                type: "value",
+                splitArea: {
+                    show: true,
+                    areaStyle: {
+                        color: dark
+                            ? ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.045)"]
+                            : ["rgba(15,23,42,0.03)", "rgba(15,23,42,0.06)"]
+                    }
+                }
+            };
             baseOption.yAxis = {
                 type: "category",
                 data: payload.xAxis || [],
-                axisLabel: { interval: 0, rotate: 0 }
+                axisLabel: { interval: 0, rotate: 0 },
+                splitArea: { show: false }
             };
         } else {
             baseOption.xAxis = {
                 type: "category",
                 data: payload.xAxis || [],
-                axisLabel: { interval: 0, rotate: 0 }
+                axisLabel: { interval: 0, rotate: 0 },
+                splitArea: { show: false }
             };
-            baseOption.yAxis = { type: "value" };
+            baseOption.yAxis = {
+                type: "value",
+                splitArea: {
+                    show: true,
+                    areaStyle: {
+                        color: dark
+                            ? ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.045)"]
+                            : ["rgba(15,23,42,0.03)", "rgba(15,23,42,0.06)"]
+                    }
+                }
+            };
         }
         baseOption.tooltip = { trigger: "axis" };
         if ((payload.xAxis || []).length > 8) {
@@ -727,7 +749,7 @@
                 data: rawData,
                 smooth: !!s.smooth,
                 showSymbol: type === "line",
-                showBackground: type === "bar",
+                showBackground: false,
                 barMaxWidth: 42
             };
             if (kind === "area" || kind === "stack_area") {

@@ -47,6 +47,7 @@ func New(assets fs.FS) *Server {
 		viz.GET("/demo", h.vizDemo)
 		viz.GET("/clear", h.vizClear)
 		viz.POST("/upload", h.vizUpload)
+		viz.POST("/validate-hierarchy", h.vizValidateHierarchy)
 		viz.POST("/chart", h.vizChart)
 	}
 

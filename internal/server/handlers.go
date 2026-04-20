@@ -197,6 +197,31 @@ func (h *handlers) vizUpload(c *gin.Context) {
 	renderVizMapper(c, dataset, viz.Config{}, "")
 }
 
+func (h *handlers) vizValidateHierarchy(c *gin.Context) {
+	datasetID := strings.TrimSpace(c.PostForm("dataset_id"))
+	dataset, ok := data.Load(datasetID)
+	if !ok {
+		c.JSON(200, gin.H{
+			"ok":       false,
+			"errors":   []string{"数据已过期，请重新上传文件。"},
+			"warnings": []string{},
+			"stats":    gin.H{},
+		})
+		return
+	}
+
+	vizCfg := viz.Normalize(viz.Config{
+		ChartKind:    strings.TrimSpace(c.PostForm("chart_kind")),
+		NodeIDCol:    strings.TrimSpace(c.PostForm("node_id_col")),
+		ParentIDCol:  strings.TrimSpace(c.PostForm("parent_id_col")),
+		NameCol:      strings.TrimSpace(c.PostForm("name_col")),
+		NodeValueCol: strings.TrimSpace(c.PostForm("node_value_col")),
+	})
+
+	result := viz.ValidateHierarchy(dataset, vizCfg)
+	c.JSON(200, result)
+}
+
 func (h *handlers) vizChart(c *gin.Context) {
 	datasetID := c.PostForm("dataset_id")
 	dataset, ok := data.Load(datasetID)
