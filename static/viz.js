@@ -21,9 +21,14 @@
 
     const hasTitleText = !!String(titleData.text || "").trim();
     const hasSubTitleText = !!String(titleData.subtext || "").trim();
-    // Keep legend below toolbox to avoid overlap with action icons.
-    const legendTop = 44;
-    const gridTop = 102;
+
+    // Reserve enough top space for title/subtitle so legend/toolbox do not overlap.
+    const titleTop = 10;
+    const titleLineHeight = hasTitleText ? 24 : 0;
+    const subTitleLineHeight = hasSubTitleText ? 18 : 0;
+    const titleBlockBottom = titleTop + titleLineHeight + subTitleLineHeight;
+    const legendTop = Math.max(44, titleBlockBottom + 10);
+    const gridTop = legendTop + 58;
 
     const toolboxTheme = {
         border: dark ? "#94a3b8" : "#64748b",
@@ -155,7 +160,7 @@
         backgroundColor: "transparent",
         title: Object.assign({
             left: 10,
-            top: 10,
+            top: titleTop,
             textStyle: { fontSize: 16, fontWeight: 700 },
             subtextStyle: { fontSize: 11, color: "#64748b" }
         }, titleData),
