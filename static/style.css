@@ -511,7 +511,20 @@ details.mapping-card>summary small {
 }
 
 .page-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 2px 2px 0;
+}
+
+.page-section-main {
+  min-width: 0;
+}
+
+.page-entry-btn {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .page-section-title,
@@ -863,6 +876,15 @@ th {
 
   .chart-lg {
     height: 620px;
+  }
+
+  .page-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-entry-btn {
+    margin-top: 8px;
   }
 }
 

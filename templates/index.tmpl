@@ -22,7 +22,6 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <h1>甘特图工作台</h1>
-        <a class="btn btn-outline-secondary btn-sm me-2" href="/" title="返回工具入口">入口</a>
         <button type="button" id="toggleSidebar" class="icon-btn btn btn-outline-primary btn-sm" aria-label="收起边栏"><i class="bi bi-chevron-left"></i></button>
       </div>
 
@@ -222,8 +221,11 @@
 
     <main class="content">
       <header class="content-head page-section-head">
-        <h2 class="page-section-title">结果面板</h2>
-        <p class="page-section-subtitle">{{if .DatasetID}}右侧包含数据表和甘特图，可展开或收起。{{else}}先在左侧上传数据并选择列映射。{{end}}</p>
+        <div class="page-section-main">
+          <h2 class="page-section-title">结果面板</h2>
+          <p class="page-section-subtitle">{{if .DatasetID}}右侧包含数据表和甘特图，可展开或收起。{{else}}先在左侧上传数据并选择列映射。{{end}}</p>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm page-entry-btn" href="/" title="返回工具入口">入口</a>
       </header>
 
       {{if .DatasetID}}
