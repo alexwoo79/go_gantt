@@ -30,11 +30,25 @@ func New(assets fs.FS) *Server {
 	r.SetHTMLTemplate(template.Must(template.ParseFS(assets, "templates/*.tmpl")))
 
 	h := &handlers{assets: assets}
-	r.GET("/", h.home)
-	r.GET("/demo", h.demo)
-	r.GET("/clear", h.clear)
-	r.POST("/upload", h.upload)
-	r.POST("/chart", h.chart)
+	r.GET("/", h.entry)
+
+	gantt := r.Group("/gantt")
+	{
+		gantt.GET("", h.ganttHome)
+		gantt.GET("/demo", h.ganttDemo)
+		gantt.GET("/clear", h.ganttClear)
+		gantt.POST("/upload", h.ganttUpload)
+		gantt.POST("/chart", h.ganttChart)
+	}
+
+	viz := r.Group("/viz")
+	{
+		viz.GET("", h.vizHome)
+		viz.GET("/demo", h.vizDemo)
+		viz.GET("/clear", h.vizClear)
+		viz.POST("/upload", h.vizUpload)
+		viz.POST("/chart", h.vizChart)
+	}
 
 	_ = charts.All()
 

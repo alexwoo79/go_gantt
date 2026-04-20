@@ -22,8 +22,11 @@
       <article class="metric"><h3>最长周期(天)</h3><p id="mMax">0</p></article>
     </section>
 
-    <section class="panel">
-      <h2>任务甘特图</h2>
+    <section class="panel" id="ganttPanel">
+      <div class="panel-title-row">
+        <h2>任务甘特图</h2>
+        <button type="button" class="btn-fs-overlay" id="ganttFullscreenBtn" aria-label="全屏显示甘特图" title="全屏显示甘特图">全屏</button>
+      </div>
       <div id="gantt" class="chart chart-lg"></div>
     </section>
 

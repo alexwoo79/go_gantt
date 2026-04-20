@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+  {{if .HasChart}}
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/theme/dark.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/theme/vintage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/theme/macarons.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/theme/shine.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/theme/roma.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6/theme/infographic.js"></script>
+  {{end}}
+</head>
+<body class="app-body">
+  {{$cfg := .VizConfig}}
+  {{$headers := .Headers}}
+  <div class="workspace {{if .DatasetID}}with-data{{end}}" id="workspaceRoot">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <h1>通用图形工作台</h1>
+        <a class="btn btn-outline-secondary btn-sm me-2" href="/" title="返回工具入口">入口</a>
+        <button type="button" id="toggleSidebar" class="icon-btn btn btn-outline-primary btn-sm" aria-label="收起边栏"><i class="bi bi-chevron-left"></i></button>
+      </div>
+
+      <div class="demo-toggle-wrap">
+        {{if or (eq .FileName "demo.csv") (eq .FileName "viz-demo.csv")}}
+        <a class="demo-toggle-btn demo-loaded" href="/viz/clear" title="取消演示数据，清空当前内容">
+          <i class="bi bi-x-circle"></i>
+          <span>取消演示数据</span>
+        </a>
+        {{else if .FileName}}
+        <a class="demo-toggle-btn demo-active" href="/viz/demo" title="当前已有数据，点击切换为演示数据">
+          <i class="bi bi-arrow-repeat"></i>
+          <span>切换演示数据</span>
+        </a>
+        {{else}}
+        <a class="demo-toggle-btn" href="/viz/demo" title="加载内置演示数据">
+          <i class="bi bi-play-circle"></i>
+          <span>使用演示数据</span>
+        </a>
+        {{end}}
+      </div>
+
+      <section class="side-card">
+        <h2>数据源</h2>
+        <form class="upload-form" action="/viz/upload" method="post" enctype="multipart/form-data">
+          <input class="form-control form-control-sm" type="file" name="data_file" accept=".csv,.xlsx,.xlsm,.xltx,.xltm" required />
+          <button class="btn btn-primary w-100" type="submit">上传文件</button>
+        </form>
+        <p class="hint">上传后可先用预设模板或示例预设，再按图形类型微调字段映射。</p>
+        {{if .FileName}}<p class="hint">当前数据：{{.FileName}}</p>{{end}}
+        {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+      </section>
+
+      {{if .DatasetID}}
+      <section class="side-card mapping-shell">
+        <form action="/viz/chart" method="post" class="mapping-form">
+          <input type="hidden" name="dataset_id" value="{{.DatasetID}}" />
+
+          <details class="mapping-card" open>
+            <summary>
+              <span>图形配置与映射</span>
+              <small>点击展开</small>
+            </summary>
+            <div class="mapping-body">
+
+              <details class="config-group" open>
+                <summary>图形选择与说明</summary>
+                <div class="config-group-body">
+
+              <label class="mapping-field">图形类型
+                <select class="form-select form-select-sm" name="chart_kind" id="chart_kind">
+                  <option value="bar" {{if eq (index $cfg "ChartKind") "bar"}}selected{{end}}>柱状图</option>
+                  <option value="line" {{if eq (index $cfg "ChartKind") "line"}}selected{{end}}>折线图</option>
+                  <option value="area" {{if eq (index $cfg "ChartKind") "area"}}selected{{end}}>面积图</option>
+                  <option value="stack_bar" {{if eq (index $cfg "ChartKind") "stack_bar"}}selected{{end}}>堆叠柱状图</option>
+                  <option value="stack_area" {{if eq (index $cfg "ChartKind") "stack_area"}}selected{{end}}>堆叠面积图</option>
+                  <option value="scatter" {{if eq (index $cfg "ChartKind") "scatter"}}selected{{end}}>散点图</option>
+                  <option value="pie" {{if eq (index $cfg "ChartKind") "pie"}}selected{{end}}>饼图</option>
+                  <option value="donut" {{if eq (index $cfg "ChartKind") "donut"}}selected{{end}}>环形图</option>
+                  <option value="funnel" {{if eq (index $cfg "ChartKind") "funnel"}}selected{{end}}>漏斗图</option>
+                  <option value="radar" {{if eq (index $cfg "ChartKind") "radar"}}selected{{end}}>雷达图</option>
+                  <option value="gauge" {{if eq (index $cfg "ChartKind") "gauge"}}selected{{end}}>仪表盘</option>
+                  <option value="sankey" {{if eq (index $cfg "ChartKind") "sankey"}}selected{{end}}>桑基图</option>
+                  <option value="graph" {{if eq (index $cfg "ChartKind") "graph"}}selected{{end}}>关系图</option>
+                  <option value="chord" {{if eq (index $cfg "ChartKind") "chord"}}selected{{end}}>和弦图</option>
+                  <option value="tree" {{if eq (index $cfg "ChartKind") "tree"}}selected{{end}}>树图</option>
+                  <option value="treemap" {{if eq (index $cfg "ChartKind") "treemap"}}selected{{end}}>矩形树图</option>
+                </select>
+              </label>
+
+              <label class="mapping-field">预设模板
+                <select class="form-select form-select-sm" id="presetTemplate">
+                  <option value="">(手动配置)</option>
+                  <option value="trend">趋势分析</option>
+                  <option value="comparison">对比分析</option>
+                  <option value="composition">构成分析</option>
+                  <option value="relation">关系分析</option>
+                  <option value="hierarchy">层级分析</option>
+                </select>
+              </label>
+
+              <p class="hint">趋势/对比适合坐标系图，构成适合饼图/漏斗，关系适合桑基/关系/和弦，层级适合树图/矩形树图。</p>
+              <div id="fieldGuide" class="field-guide" aria-live="polite"></div>
+
+                </div>
+              </details>
+
+              <details class="config-group" open>
+                <summary>标题与显示</summary>
+                <div class="config-group-body">
+
+              <label class="mapping-field" data-field="title_text">标题
+                <input class="form-control form-control-sm" type="text" name="title_text" value="{{index $cfg "Title"}}" placeholder="例如：各项目工时对比" />
+              </label>
+
+              <label class="mapping-field" data-field="subtitle_text">副标题
+                <input class="form-control form-control-sm" type="text" name="subtitle_text" value="{{index $cfg "SubTitle"}}" placeholder="例如：2026 Q2" />
+              </label>
+
+              <label class="mapping-field" data-field="series_name">系列名
+                <input class="form-control form-control-sm" type="text" name="series_name" value="{{index $cfg "SeriesName"}}" placeholder="例如：工时" />
+              </label>
+
+              <label class="mapping-field" data-field="series2_name">系列2名称（可选）
+                <input class="form-control form-control-sm" type="text" name="series2_name" value="{{index $cfg "Series2Name"}}" placeholder="例如：目标值" />
+              </label>
+
+              <label class="mapping-field" data-field="series3_name">系列3名称（可选）
+                <input class="form-control form-control-sm" type="text" name="series3_name" value="{{index $cfg "Series3Name"}}" placeholder="例如：预算值" />
+              </label>
+
+              <div class="checks">
+                <div class="form-check mapping-check" data-field="smooth_line">
+                  <input class="form-check-input" type="checkbox" id="chk_smooth" name="smooth_line" {{if index $cfg "SmoothLine"}}checked{{end}} />
+                  <label class="form-check-label" for="chk_smooth">平滑折线</label>
+                </div>
+                <div class="form-check mapping-check" data-field="aggregate_by_name">
+                  <input class="form-check-input" type="checkbox" id="chk_agg" name="aggregate_by_name" {{if index $cfg "AggregateByName"}}checked{{end}} />
+                  <label class="form-check-label" for="chk_agg">同名称聚合（饼图/漏斗）</label>
+                </div>
+              </div>
+
+              <label class="mapping-field" data-field="sort_mode">排序方式（按值1）
+                <select class="form-select form-select-sm" name="sort_mode">
+                  <option value="none" {{if or (eq (index $cfg "SortMode") "") (eq (index $cfg "SortMode") "none")}}selected{{end}}>不排序</option>
+                  <option value="asc" {{if eq (index $cfg "SortMode") "asc"}}selected{{end}}>升序</option>
+                  <option value="desc" {{if eq (index $cfg "SortMode") "desc"}}selected{{end}}>降序</option>
+                </select>
+              </label>
+
+                </div>
+              </details>
+
+              <details class="config-group" open id="xy_group_shell">
+                <summary>坐标系映射</summary>
+                <div class="config-group-body">
+
+              <div id="xy_mapping_group">
+                <label class="mapping-field" data-field="x_col">X 轴列（柱状/折线/面积/散点）
+                  <select class="form-select form-select-sm" name="x_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "XCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="y_col">Y 轴列（值1，需数值）
+                  <select class="form-select form-select-sm" name="y_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "YCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="y2_col">Y2 列（可选，双系列/雷达）
+                  <select class="form-select form-select-sm" name="y2_col">
+                    <option value="">(不使用)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "Y2Col") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="y3_col">Y3 列（可选，雷达）
+                  <select class="form-select form-select-sm" name="y3_col">
+                    <option value="">(不使用)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "Y3Col") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <div id="dynamic_y_fields">
+                  {{range $i, $v := (index $cfg "YExtraCols")}}
+                  <label class="mapping-field dynamic-y-field">扩展指标列
+                    <select class="form-select form-select-sm" name="y_extra_cols">
+                      <option value="">(请选择)</option>
+                      {{range $headers}}
+                      <option value="{{.}}" {{if eq . $v}}selected{{end}}>{{.}}</option>
+                      {{end}}
+                    </select>
+                  </label>
+                  {{end}}
+                </div>
+
+                <label class="mapping-field" data-field="y_metric_count">Y 指标数量（宽表可扩展）
+                  <select class="form-select form-select-sm" id="y_metric_count" name="y_metric_count">
+                    <option value="1" {{if eq (index $cfg "YMetricCount") "1"}}selected{{end}}>1 个</option>
+                    <option value="2" {{if eq (index $cfg "YMetricCount") "2"}}selected{{end}}>2 个</option>
+                    <option value="3" {{if eq (index $cfg "YMetricCount") "3"}}selected{{end}}>3 个</option>
+                    <option value="4" {{if eq (index $cfg "YMetricCount") "4"}}selected{{end}}>4 个</option>
+                    <option value="5" {{if eq (index $cfg "YMetricCount") "5"}}selected{{end}}>5 个</option>
+                    <option value="6" {{if eq (index $cfg "YMetricCount") "6"}}selected{{end}}>6 个</option>
+                    <option value="7" {{if eq (index $cfg "YMetricCount") "7"}}selected{{end}}>7 个</option>
+                    <option value="8" {{if eq (index $cfg "YMetricCount") "8"}}selected{{end}}>8 个</option>
+                    <option value="9" {{if eq (index $cfg "YMetricCount") "9"}}selected{{end}}>9 个</option>
+                    <option value="10" {{if eq (index $cfg "YMetricCount") "10"}}selected{{end}}>10 个</option>
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="size_col">气泡大小列（散点可选）
+                  <select class="form-select form-select-sm" name="size_col">
+                    <option value="">(不使用)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "SizeCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+              </div>
+
+                </div>
+              </details>
+
+              <details class="config-group" open id="metric_group_shell">
+                <summary>构成与指标映射</summary>
+                <div class="config-group-body">
+
+              <div id="pie_mapping_group">
+                <label class="mapping-field" data-field="name_col">名称列（饼图/环形图/漏斗图/雷达）
+                  <select class="form-select form-select-sm" name="name_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "NameCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="value_col">值列（值1）
+                  <select class="form-select form-select-sm" name="value_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "ValueCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="value2_col">值2列（可选，漏斗双序列预留）
+                  <select class="form-select form-select-sm" name="value2_col">
+                    <option value="">(不使用)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "Value2Col") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="gauge_mode">仪表盘聚合方式
+                  <select class="form-select form-select-sm" name="gauge_mode">
+                    <option value="avg" {{if or (eq (index $cfg "GaugeMode") "") (eq (index $cfg "GaugeMode") "avg")}}selected{{end}}>平均值</option>
+                    <option value="first" {{if eq (index $cfg "GaugeMode") "first"}}selected{{end}}>首条记录</option>
+                    <option value="max" {{if eq (index $cfg "GaugeMode") "max"}}selected{{end}}>最大值</option>
+                    <option value="min" {{if eq (index $cfg "GaugeMode") "min"}}selected{{end}}>最小值</option>
+                  </select>
+                </label>
+              </div>
+
+                </div>
+              </details>
+
+              <details class="config-group" open id="relation_group_shell">
+                <summary>关系与层级映射</summary>
+                <div class="config-group-body">
+
+              <div id="relation_mapping_group">
+                <label class="mapping-field" data-field="source_col">来源列（桑基/关系/和弦）
+                  <select class="form-select form-select-sm" name="source_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "SourceCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="target_col">目标列（桑基/关系/和弦）
+                  <select class="form-select form-select-sm" name="target_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "TargetCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="link_value_col">连接权重列（可选）
+                  <select class="form-select form-select-sm" name="link_value_col">
+                    <option value="">(不使用)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "LinkValueCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="node_id_col">节点ID列（树/矩形树图）
+                  <select class="form-select form-select-sm" name="node_id_col">
+                    <option value="">(可为空，回退名称列)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "NodeIDCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="parent_id_col">父节点列（树/矩形树图）
+                  <select class="form-select form-select-sm" name="parent_id_col">
+                    <option value="">(请选择)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "ParentIDCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+
+                <label class="mapping-field" data-field="node_value_col">节点值列（可选）
+                  <select class="form-select form-select-sm" name="node_value_col">
+                    <option value="">(不使用)</option>
+                    {{range .Headers}}
+                    <option value="{{.}}" {{if eq (index $cfg "NodeValueCol") .}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                  </select>
+                </label>
+              </div>
+
+                </div>
+              </details>
+
+            </div>
+          </details>
+
+          <div class="mapping-fixed">
+            <label class="mapping-field" data-field="chart_theme">ECharts 主题
+              <select class="form-select form-select-sm" name="chart_theme">
+                <option value="default" {{if eq (index $cfg "Theme") "default"}}selected{{end}}>默认</option>
+                <option value="macarons" {{if eq (index $cfg "Theme") "macarons"}}selected{{end}}>Macarons</option>
+                <option value="infographic" {{if eq (index $cfg "Theme") "infographic"}}selected{{end}}>Infographic</option>
+                <option value="shine" {{if eq (index $cfg "Theme") "shine"}}selected{{end}}>Shine</option>
+                <option value="roma" {{if eq (index $cfg "Theme") "roma"}}selected{{end}}>Roma</option>
+                <option value="vintage" {{if eq (index $cfg "Theme") "vintage"}}selected{{end}}>Vintage</option>
+                <option value="dark" {{if eq (index $cfg "Theme") "dark"}}selected{{end}}>Dark</option>
+              </select>
+            </label>
+
+            <button class="btn btn-outline-secondary w-100 mt-1" type="button" id="applyPreset">应用示例预设</button>
+
+            <button class="btn btn-primary w-100 mt-1" type="submit">生成图形</button>
+          </div>
+        </form>
+      </section>
+      {{end}}
+    </aside>
+
+    <main class="content">
+      <header class="content-head page-section-head">
+        <h2 class="page-section-title">结果面板</h2>
+        <p class="page-section-subtitle">{{if .DatasetID}}右侧包含数据预览与图形结果。{{else}}先上传数据，再配置图形字段映射。{{end}}</p>
+      </header>
+
+      <section class="panel mt-3 viz-guide-panel" id="vizGuidePanel">
+        <div class="panel-title-row mb-3 gap-2">
+          <div class="panel-head-main flex-grow-1">
+            <h3 class="panel-title mb-0"><i class="bi bi-grid-3x3-gap me-1"></i>图形说明</h3>
+            <p class="panel-subtitle mb-0">点击卡片可直接切换图形类型，并与左侧图形类型选择保持同步。</p>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm viz-guide-toggle" id="toggleGuideCards" aria-expanded="true">
+            <i class="bi bi-arrows-collapse"></i>
+            <span>收起卡片</span>
+          </button>
+        </div>
+        <div class="viz-guide-grid" id="vizGuideGrid">
+          {{range .VizDefs}}
+          <article class="viz-guide-card" data-kind="{{.Kind}}" role="button" tabindex="0" aria-pressed="false">
+            <div class="viz-guide-head">
+              <span class="viz-guide-title">{{.Name}}</span>
+              <span class="viz-guide-family">{{.Family}}</span>
+            </div>
+            <p class="viz-guide-desc">{{.Description}}</p>
+            <p class="viz-guide-hint">{{.Hint}}</p>
+          </article>
+          {{end}}
+        </div>
+      </section>
+
+      {{if .DatasetID}}
+      <details class="panel mt-3" {{if not .HasChart}}open{{end}}>
+        <summary class="panel-summary">
+          <span class="panel-head-main">
+            <span class="panel-summary-title"><i class="bi bi-table me-1"></i>数据预览</span>
+            <span class="panel-summary-subtitle">展示前 {{len .Preview}} 行原始数据</span>
+          </span>
+          <small class="panel-summary-note">可收回</small>
+        </summary>
+        <div class="table-wrap mt-2">
+          <table class="preview-table">
+            <thead><tr>{{range .Headers}}<th>{{.}}</th>{{end}}</tr></thead>
+            <tbody>
+              {{range .Preview}}
+              <tr>{{range .}}<td>{{.}}</td>{{end}}</tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {{end}}
+
+      {{if .HasChart}}
+      <section class="panel mt-3" id="vizPanel">
+        <div class="panel-title-row mb-1 gap-2">
+          <div class="panel-head-main flex-grow-1">
+            <h3 class="panel-title mb-0"><i class="bi bi-graph-up me-1"></i>图形渲染</h3>
+            <p class="panel-subtitle mb-0">根据字段映射生成 ECharts 图形</p>
+          </div>
+        </div>
+        <div id="vizChart" class="chart chart-lg"></div>
+      </section>
+
+      <script>
+        window.VIZ_DATA = {
+          payload: {{.ChartJSON}},
+          theme: "{{index $cfg "Theme"}}"
+        };
+      </script>
+      <script src="/static/viz.js"></script>
+      {{end}}
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var sidebar = document.getElementById('sidebar');
+      var toggleBtn = document.getElementById('toggleSidebar');
+      if (!sidebar || !toggleBtn) return;
+      toggleBtn.addEventListener('click', function () {
+        sidebar.classList.toggle('collapsed');
+      });
+
+      var kindSelect = document.getElementById('chart_kind');
+      var xyGroup = document.getElementById('xy_mapping_group');
+      var pieGroup = document.getElementById('pie_mapping_group');
+      var relationGroup = document.getElementById('relation_mapping_group');
+      var xyGroupShell = document.getElementById('xy_group_shell');
+      var metricGroupShell = document.getElementById('metric_group_shell');
+      var relationGroupShell = document.getElementById('relation_group_shell');
+      var presetBtn = document.getElementById('applyPreset');
+      var presetTemplate = document.getElementById('presetTemplate');
+      var fieldGuide = document.getElementById('fieldGuide');
+      var yMetricCountSelect = document.getElementById('y_metric_count');
+      var dynamicYFields = document.getElementById('dynamic_y_fields');
+      var guidePanel = document.getElementById('vizGuidePanel');
+      var guideGrid = document.getElementById('vizGuideGrid');
+      var guideToggleBtn = document.getElementById('toggleGuideCards');
+      var guideCards = document.querySelectorAll('.viz-guide-card');
+      var guideStorageKey = 'viz-guide-collapsed';
+      var yExtraColsStorageKey = 'viz-y-extra-cols-selection';
+
+      function setGuideCollapsed(collapsed) {
+        if (!guidePanel || !guideToggleBtn || !guideGrid) return;
+        guidePanel.classList.toggle('is-collapsed', collapsed);
+        guideGrid.style.display = collapsed ? 'none' : 'grid';
+        guideToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        guideToggleBtn.innerHTML = collapsed
+          ? '<i class="bi bi-arrows-expand"></i><span>展开卡片</span>'
+          : '<i class="bi bi-arrows-collapse"></i><span>收起卡片</span>';
+        try {
+          window.localStorage.setItem(guideStorageKey, collapsed ? '1' : '0');
+        } catch (e) {
+          // ignore storage errors (private mode / quota)
+        }
+      }
+
+      function activateKindByCard(kind) {
+        if (!kindSelect || !kind) return;
+        var exists = Array.prototype.some.call(kindSelect.options, function (opt) {
+          return opt.value === kind;
+        });
+        if (!exists) return;
+        kindSelect.value = kind;
+        syncMappingBlocks();
+      }
+
+      if (guideToggleBtn) {
+        guideToggleBtn.addEventListener('click', function () {
+          var collapsed = guidePanel && guidePanel.classList.contains('is-collapsed');
+          setGuideCollapsed(!collapsed);
+        });
+      }
+
+      try {
+        var savedCollapsed = window.localStorage.getItem(guideStorageKey) === '1';
+        setGuideCollapsed(savedCollapsed);
+      } catch (e) {
+        setGuideCollapsed(false);
+      }
+
+      Array.prototype.forEach.call(guideCards, function (card) {
+        card.addEventListener('click', function () {
+          activateKindByCard(card.getAttribute('data-kind'));
+        });
+        card.addEventListener('keydown', function (event) {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          activateKindByCard(card.getAttribute('data-kind'));
+        });
+      });
+
+      if (!kindSelect || !xyGroup || !pieGroup || !relationGroup) return;
+
+      var allFields = [
+        'title_text', 'subtitle_text', 'series_name', 'series2_name', 'series3_name',
+        'smooth_line', 'aggregate_by_name', 'sort_mode',
+        'x_col', 'y_col', 'y2_col', 'y3_col', 'y_metric_count', 'size_col',
+        'name_col', 'value_col', 'value2_col', 'gauge_mode',
+        'source_col', 'target_col', 'link_value_col',
+        'node_id_col', 'parent_id_col', 'node_value_col',
+        'chart_theme'
+      ];
+
+      var fieldLabels = {
+        title_text: '标题',
+        subtitle_text: '副标题',
+        series_name: '系列名',
+        series2_name: '系列2名称',
+        series3_name: '系列3名称',
+        smooth_line: '平滑折线',
+        aggregate_by_name: '同名称聚合',
+        sort_mode: '排序方式',
+        x_col: 'X轴列',
+        y_col: 'Y轴列',
+        y2_col: 'Y2列',
+        y3_col: 'Y3列',
+        y_metric_count: 'Y指标数量',
+        size_col: '气泡大小列',
+        name_col: '名称列',
+        value_col: '值列',
+        value2_col: '值2列',
+        gauge_mode: '仪表盘聚合方式',
+        source_col: '来源列',
+        target_col: '目标列',
+        link_value_col: '连接权重列',
+        node_id_col: '节点ID列',
+        parent_id_col: '父节点列',
+        node_value_col: '节点值列',
+        chart_theme: 'ECharts主题'
+      };
+
+      var chartRules = {
+        bar: {
+          required: ['x_col', 'y_col'],
+          optional: ['y2_col', 'y3_col', 'y_metric_count', 'sort_mode', 'series2_name', 'series3_name']
+        },
+        line: {
+          required: ['x_col', 'y_col'],
+          optional: ['y2_col', 'y3_col', 'y_metric_count', 'sort_mode', 'smooth_line', 'series2_name', 'series3_name']
+        },
+        area: {
+          required: ['x_col', 'y_col'],
+          optional: ['y2_col', 'y3_col', 'y_metric_count', 'sort_mode', 'smooth_line', 'series2_name', 'series3_name']
+        },
+        stack_bar: {
+          required: ['x_col', 'y_col'],
+          optional: ['y2_col', 'y3_col', 'y_metric_count', 'sort_mode', 'series2_name', 'series3_name']
+        },
+        stack_area: {
+          required: ['x_col', 'y_col'],
+          optional: ['y2_col', 'y3_col', 'y_metric_count', 'sort_mode', 'smooth_line', 'series2_name', 'series3_name']
+        },
+        scatter: {
+          required: ['x_col', 'y_col'],
+          optional: ['size_col']
+        },
+        pie: {
+          required: ['name_col', 'value_col'],
+          optional: ['aggregate_by_name', 'sort_mode']
+        },
+        donut: {
+          required: ['name_col', 'value_col'],
+          optional: ['aggregate_by_name', 'sort_mode']
+        },
+        funnel: {
+          required: ['name_col', 'value_col'],
+          optional: ['value2_col', 'aggregate_by_name', 'sort_mode']
+        },
+        radar: {
+          required: ['name_col', 'y_col'],
+          optional: ['y2_col', 'y3_col', 'y_metric_count', 'sort_mode']
+        },
+        gauge: {
+          required: ['value_col'],
+          optional: ['gauge_mode']
+        },
+        sankey: {
+          required: ['source_col', 'target_col'],
+          optional: ['link_value_col']
+        },
+        graph: {
+          required: ['source_col', 'target_col'],
+          optional: ['link_value_col']
+        },
+        chord: {
+          required: ['source_col', 'target_col'],
+          optional: ['link_value_col']
+        },
+        tree: {
+          required: ['parent_id_col'],
+          optional: ['node_id_col', 'name_col', 'node_value_col']
+        },
+        treemap: {
+          required: ['parent_id_col'],
+          optional: ['node_id_col', 'name_col', 'node_value_col']
+        }
+      };
+
+      function setFieldState(name, visible, required, recommended) {
+        var row = document.querySelector('[data-field="' + name + '"]');
+        if (!row) return;
+        row.style.display = visible ? '' : 'none';
+        row.classList.toggle('is-required', !!visible && !!required);
+        row.classList.toggle('is-recommended', !!visible && !!recommended && !required);
+
+        var input = document.querySelector('[name="' + name + '"]');
+        if (input) {
+          input.disabled = !visible;
+          if (input.type !== 'checkbox') {
+            input.required = !!visible && !!required;
+          }
+        }
+      }
+
+      function readMetricCount() {
+        if (!yMetricCountSelect) return 1;
+        var count = parseInt(yMetricCountSelect.value || '1', 10);
+        return isNaN(count) ? 1 : count;
+      }
+
+      function setMetricCountValue(value) {
+        if (!yMetricCountSelect) return;
+        yMetricCountSelect.value = String(value);
+      }
+
+      function collectExtraYValues() {
+        if (!dynamicYFields) return [];
+        return Array.prototype.map.call(
+          dynamicYFields.querySelectorAll('select[name="y_extra_cols"]'),
+          function (el) { return el.value; }
+        );
+      }
+
+      function buildHeaderOptions() {
+        var ySelect = document.querySelector('[name="y_col"]');
+        if (!ySelect) return [];
+        return Array.prototype.map.call(ySelect.options, function (opt) {
+          return { value: opt.value, text: opt.textContent };
+        });
+      }
+
+      function renderDynamicYFields(extraCount, values, required) {
+        if (!dynamicYFields) return;
+        var headers = buildHeaderOptions();
+        dynamicYFields.innerHTML = '';
+        for (var i = 0; i < extraCount; i++) {
+          var label = document.createElement('label');
+          label.className = 'mapping-field dynamic-y-field';
+          label.textContent = 'Y' + (i + 4) + ' 列（扩展）';
+
+          var select = document.createElement('select');
+          select.className = 'form-select form-select-sm';
+          select.name = 'y_extra_cols';
+          select.required = !!required;
+
+          for (var j = 0; j < headers.length; j++) {
+            var opt = document.createElement('option');
+            opt.value = headers[j].value;
+            opt.textContent = headers[j].text;
+            if ((values[i] || '') === headers[j].value) {
+              opt.selected = true;
+            }
+            select.appendChild(opt);
+          }
+
+          label.appendChild(select);
+          dynamicYFields.appendChild(label);
+        }
+      }
+
+      function syncYMetricFields(kind) {
+        var y2Field = document.querySelector('[data-field="y2_col"]');
+        var y3Field = document.querySelector('[data-field="y3_col"]');
+        var metricField = document.querySelector('[data-field="y_metric_count"]');
+        var s2Field = document.querySelector('[data-field="series2_name"]');
+        var s3Field = document.querySelector('[data-field="series3_name"]');
+        var y2Input = document.querySelector('[name="y2_col"]');
+        var y3Input = document.querySelector('[name="y3_col"]');
+        var isScatter = kind === 'scatter';
+
+        if (isScatter) {
+          if (y2Field) y2Field.style.display = 'none';
+          if (y3Field) y3Field.style.display = 'none';
+          if (metricField) metricField.style.display = 'none';
+          if (s2Field) s2Field.style.display = 'none';
+          if (s3Field) s3Field.style.display = 'none';
+          if (y2Input) {
+            y2Input.disabled = true;
+            y2Input.required = false;
+          }
+          if (y3Input) {
+            y3Input.disabled = true;
+            y3Input.required = false;
+          }
+          if (yMetricCountSelect) {
+            yMetricCountSelect.disabled = true;
+          }
+          if (dynamicYFields) {
+            dynamicYFields.innerHTML = '';
+          }
+          return;
+        }
+
+        if (metricField) metricField.style.display = '';
+        if (yMetricCountSelect) {
+          yMetricCountSelect.disabled = false;
+        }
+
+        var count = readMetricCount();
+        var minCount = kind === 'radar' ? 2 : 1;
+        if (count < minCount) count = minCount;
+        if (count > 10) count = 10;
+        setMetricCountValue(count);
+
+        var showY2 = count >= 2;
+        var showY3 = count >= 3;
+        if (y2Field) y2Field.style.display = showY2 ? '' : 'none';
+        if (y3Field) y3Field.style.display = showY3 ? '' : 'none';
+        if (y2Input) {
+          y2Input.disabled = !showY2;
+          y2Input.required = showY2;
+        }
+        if (y3Input) {
+          y3Input.disabled = !showY3;
+          y3Input.required = showY3;
+        }
+
+        var showSeries2 = showY2 && kind !== 'radar';
+        var showSeries3 = showY3 && kind !== 'radar';
+        if (s2Field) s2Field.style.display = showSeries2 ? '' : 'none';
+        if (s3Field) s3Field.style.display = showSeries3 ? '' : 'none';
+
+        var keepValues = collectExtraYValues();
+        renderDynamicYFields(Math.max(0, count - 3), keepValues, count > 3);
+        
+        // Apply stored extra Y column selections after rendering
+        setTimeout(applyStoredExtraYCols, 0);
+      }
+
+      function renderFieldGuide(required, optional) {
+        if (!fieldGuide) return;
+        var requiredHtml = required.map(function (f) {
+          return '<span class="field-chip chip-required">' + (fieldLabels[f] || f) + '</span>';
+        }).join('');
+        var optionalHtml = optional.map(function (f) {
+          return '<span class="field-chip chip-optional">' + (fieldLabels[f] || f) + '</span>';
+        }).join('');
+        fieldGuide.innerHTML =
+          '<div class="field-guide-row"><strong>必填：</strong>' + (requiredHtml || '<span class="field-chip chip-empty">无</span>') + '</div>' +
+          '<div class="field-guide-row"><strong>推荐：</strong>' + (optionalHtml || '<span class="field-chip chip-empty">无</span>') + '</div>';
+      }
+      function saveExtraYColsToStorage() {
+        var values = collectExtraYValues();
+        try {
+          window.localStorage.setItem(yExtraColsStorageKey, JSON.stringify(values));
+        } catch (e) {
+          // ignore storage errors (private mode / quota)
+        }
+      }
+
+      function loadExtraYColsFromStorage() {
+        try {
+          var stored = window.localStorage.getItem(yExtraColsStorageKey);
+          if (stored) {
+            return JSON.parse(stored);
+          }
+        } catch (e) {
+          // ignore parsing errors
+        }
+        return [];
+      }
+
+      function applyStoredExtraYCols() {
+        var storedValues = loadExtraYColsFromStorage();
+        if (!storedValues.length) return;
+        var selects = dynamicYFields.querySelectorAll('select[name="y_extra_cols"]');
+        Array.prototype.forEach.call(selects, function (select, idx) {
+          if (storedValues[idx]) {
+            select.value = storedValues[idx];
+          }
+        });
+      }
+      function syncMappingBlocks() {
+        var kind = kindSelect.value;
+        var pieKinds = ['pie', 'donut', 'funnel', 'radar', 'gauge'];
+        var relationKinds = ['sankey', 'graph', 'chord', 'tree', 'treemap'];
+        if (pieKinds.indexOf(kind) >= 0) {
+          pieGroup.style.display = 'block';
+          if (kind === 'radar') {
+            xyGroup.style.display = 'block';
+          } else {
+            xyGroup.style.display = 'none';
+          }
+          relationGroup.style.display = 'none';
+          if (xyGroupShell) xyGroupShell.open = kind === 'radar';
+          if (metricGroupShell) metricGroupShell.open = true;
+          if (relationGroupShell) relationGroupShell.open = false;
+        } else if (relationKinds.indexOf(kind) >= 0) {
+          pieGroup.style.display = kind === 'tree' || kind === 'treemap' ? 'block' : 'none';
+          xyGroup.style.display = 'none';
+          relationGroup.style.display = 'block';
+          if (xyGroupShell) xyGroupShell.open = false;
+          if (metricGroupShell) metricGroupShell.open = kind === 'tree' || kind === 'treemap';
+          if (relationGroupShell) relationGroupShell.open = true;
+        } else {
+          pieGroup.style.display = 'none';
+          xyGroup.style.display = 'block';
+          relationGroup.style.display = 'none';
+          if (xyGroupShell) xyGroupShell.open = true;
+          if (metricGroupShell) metricGroupShell.open = false;
+          if (relationGroupShell) relationGroupShell.open = false;
+        }
+
+        var rule = chartRules[kind] || { required: ['x_col', 'y_col'], optional: [] };
+        var requiredSet = {};
+        var optionalSet = {};
+        var alwaysVisible = [
+          'title_text', 'subtitle_text', 'series_name', 'chart_theme'
+        ];
+
+        rule.required.forEach(function (f) { requiredSet[f] = true; });
+        rule.optional.forEach(function (f) { optionalSet[f] = true; });
+        alwaysVisible.forEach(function (f) { optionalSet[f] = true; });
+
+        allFields.forEach(function (f) {
+          var visible = !!requiredSet[f] || !!optionalSet[f];
+          setFieldState(f, visible, !!requiredSet[f], !!optionalSet[f]);
+        });
+
+        syncYMetricFields(kind);
+
+        renderFieldGuide(rule.required, rule.optional.concat(alwaysVisible));
+
+        Array.prototype.forEach.call(guideCards, function (card) {
+          var active = card.getAttribute('data-kind') === kind;
+          card.classList.toggle('is-active', active);
+          card.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+
+        var activeCard = document.querySelector('.viz-guide-card.is-active');
+        if (activeCard && activeCard.scrollIntoView) {
+          activeCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+      }
+
+      function findHeaderByKeyword(headers, keywordList) {
+        for (var i = 0; i < headers.length; i++) {
+          var text = String(headers[i] || '').toLowerCase();
+          for (var j = 0; j < keywordList.length; j++) {
+            if (text.indexOf(keywordList[j]) >= 0) return headers[i];
+          }
+        }
+        return '';
+      }
+
+      function setSelectValue(name, value) {
+        var el = document.querySelector('[name="' + name + '"]');
+        if (!el || !value) return;
+        for (var i = 0; i < el.options.length; i++) {
+          if (el.options[i].value === value) {
+            el.value = value;
+            return;
+          }
+        }
+      }
+
+      function setInputValue(name, value) {
+        var el = document.querySelector('[name="' + name + '"]');
+        if (!el) return;
+        el.value = value;
+      }
+
+      function applyPreset() {
+        var headers = Array.prototype.map.call(
+          document.querySelectorAll('table.preview-table thead th'),
+          function (th) { return th.textContent.trim(); }
+        );
+        if (!headers.length) return;
+
+        var kind = kindSelect.value;
+        var preset = presetTemplate ? presetTemplate.value : '';
+        var map = {
+          category: findHeaderByKeyword(headers, ['category', '类', 'name', 'month', 'x']),
+          value: findHeaderByKeyword(headers, ['revenue', 'profit', 'value', 'cost', 'y']),
+          value2: findHeaderByKeyword(headers, ['cost', 'profit', 'value2', 'y2']),
+          value3: findHeaderByKeyword(headers, ['profit', 'value3', 'y3']),
+          share: findHeaderByKeyword(headers, ['share', 'rate', 'ratio', '占比']),
+          source: findHeaderByKeyword(headers, ['source', 'from', '起点', '来源']),
+          target: findHeaderByKeyword(headers, ['target', 'to', '终点', '目标']),
+          link: findHeaderByKeyword(headers, ['linkvalue', 'weight', 'flow', 'value', '权重']),
+          nodeID: findHeaderByKeyword(headers, ['nodeid', 'id', '节点']),
+          parentID: findHeaderByKeyword(headers, ['parentid', 'parent', '父']),
+          nodeValue: findHeaderByKeyword(headers, ['nodevalue', 'value', '值']),
+          sx: findHeaderByKeyword(headers, ['scatterx', 'x']),
+          sy: findHeaderByKeyword(headers, ['scattery', 'y']),
+          ss: findHeaderByKeyword(headers, ['scattersize', 'size', 'bubble'])
+        };
+
+        if (preset === 'trend') {
+          kindSelect.value = 'line';
+          kind = 'line';
+          setMetricCountValue(2);
+        } else if (preset === 'comparison') {
+          kindSelect.value = 'bar';
+          kind = 'bar';
+          setMetricCountValue(2);
+        } else if (preset === 'composition') {
+          kindSelect.value = 'donut';
+          kind = 'donut';
+          setMetricCountValue(1);
+        } else if (preset === 'relation') {
+          kindSelect.value = 'sankey';
+          kind = 'sankey';
+          setMetricCountValue(1);
+        } else if (preset === 'hierarchy') {
+          kindSelect.value = 'tree';
+          kind = 'tree';
+          setMetricCountValue(1);
+        }
+
+        syncMappingBlocks();
+
+        setInputValue('title_text', '示例：' + kind + ' 图');
+        setInputValue('subtitle_text', '自动预设映射');
+
+        if (kind === 'sankey' || kind === 'graph' || kind === 'chord') {
+          setSelectValue('source_col', map.source);
+          setSelectValue('target_col', map.target);
+          setSelectValue('link_value_col', map.link);
+          setInputValue('series_name', kind === 'chord' ? '关系和弦' : '关系网络');
+        } else if (kind === 'tree' || kind === 'treemap') {
+          setSelectValue('node_id_col', map.nodeID);
+          setSelectValue('parent_id_col', map.parentID);
+          setSelectValue('node_value_col', map.nodeValue || map.value);
+          setSelectValue('name_col', map.category || map.nodeID);
+          setInputValue('series_name', kind === 'tree' ? '组织树' : '分层占比');
+        } else if (kind === 'scatter') {
+          setSelectValue('x_col', map.sx || map.value);
+          setSelectValue('y_col', map.sy || map.value2);
+          setSelectValue('size_col', map.ss || map.share);
+          setInputValue('series_name', '散点样本');
+        } else if (kind === 'pie' || kind === 'donut' || kind === 'funnel') {
+          setSelectValue('name_col', map.category);
+          setSelectValue('value_col', map.share || map.value);
+          setInputValue('series_name', '组成结构');
+        } else if (kind === 'radar') {
+          setMetricCountValue(3);
+          setSelectValue('name_col', map.category);
+          setSelectValue('y_col', map.value);
+          setSelectValue('y2_col', map.value2 || map.share);
+          setSelectValue('y3_col', map.value3 || map.share);
+          setInputValue('series_name', '能力雷达');
+        } else if (kind === 'gauge') {
+          setSelectValue('value_col', map.value || map.share);
+          setInputValue('series_name', '仪表值');
+        } else {
+          setSelectValue('x_col', map.category);
+          setSelectValue('y_col', map.value);
+          setSelectValue('y2_col', map.value2);
+          setInputValue('series_name', '指标A');
+          setInputValue('series2_name', '指标B');
+        }
+
+      }
+
+      kindSelect.addEventListener('change', syncMappingBlocks);
+      if (yMetricCountSelect) {
+        yMetricCountSelect.addEventListener('change', syncMappingBlocks);
+      }
+      // Add listener to dynamic Y fields container for change events (event delegation)
+      if (dynamicYFields) {
+        dynamicYFields.addEventListener('change', function (e) {
+          if (e.target && e.target.name === 'y_extra_cols') {
+            saveExtraYColsToStorage();
+          }
+        });
+      }
+
+      // Clear extra Y cols storage on form submit
+      var mappingForm = document.querySelector('form.mapping-form');
+      if (mappingForm) {
+        mappingForm.addEventListener('submit', function () {
+          try {
+            window.localStorage.removeItem(yExtraColsStorageKey);
+          } catch (e) {
+            // ignore
+          }
+        });
+      }
+
+      if (presetTemplate) {
+        presetTemplate.addEventListener('change', applyPreset);
+      }
+      if (presetBtn) {
+        presetBtn.addEventListener('click', applyPreset);
+      }
+      syncMappingBlocks();
+    })();
+  </script>
+</body>
+</html>

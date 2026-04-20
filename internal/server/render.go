@@ -9,6 +9,7 @@ import (
 
 	"gantt/internal/charts"
 	"gantt/internal/model"
+	"gantt/internal/viz"
 )
 
 // renderWorkspace renders the full workspace page with an optional chart.
@@ -62,4 +63,51 @@ func renderMapper(c *gin.Context, dataset model.Dataset, errMsg string) {
 	cfg := builder.InferDefaults(dataset.Headers)
 	opts := builder.DefaultOptions()
 	renderWorkspace(c, dataset, cfg, opts, nil, model.Stats{}, errMsg)
+}
+
+func renderVizMapper(c *gin.Context, dataset model.Dataset, cfg viz.Config, errMsg string) {
+	preview := dataset.Rows
+	if len(preview) > 8 {
+		preview = preview[:8]
+	}
+
+	cfg = viz.Merge(viz.InferDefaults(dataset.Headers), cfg)
+	c.HTML(200, "viz.tmpl", gin.H{
+		"Title":       "通用图形 - 列映射与图表",
+		"DatasetID":   dataset.ID,
+		"FileName":    dataset.Name,
+		"Headers":     dataset.Headers,
+		"Preview":     preview,
+		"VizConfig":   viz.ToMap(cfg),
+		"VizDefs":     viz.Definitions(),
+		"VizFamilies": viz.Families(),
+		"Error":       errMsg,
+		"HasChart":    false,
+		"ChartTypes":  charts.All(),
+	})
+}
+
+func renderVizChart(c *gin.Context, dataset model.Dataset, cfg viz.Config, payload map[string]any, errMsg string) {
+	preview := dataset.Rows
+	if len(preview) > 8 {
+		preview = preview[:8]
+	}
+
+	cfg = viz.Merge(viz.InferDefaults(dataset.Headers), cfg)
+	chartJSON, _ := json.Marshal(payload)
+
+	c.HTML(200, "viz.tmpl", gin.H{
+		"Title":       "通用图形 - 列映射与图表",
+		"DatasetID":   dataset.ID,
+		"FileName":    dataset.Name,
+		"Headers":     dataset.Headers,
+		"Preview":     preview,
+		"VizConfig":   viz.ToMap(cfg),
+		"VizDefs":     viz.Definitions(),
+		"VizFamilies": viz.Families(),
+		"Error":       errMsg,
+		"HasChart":    true,
+		"ChartJSON":   template.JS(string(chartJSON)),
+		"ChartTypes":  charts.All(),
+	})
 }

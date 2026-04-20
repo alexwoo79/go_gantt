@@ -31,6 +31,8 @@
     dark: ["#4dd0e1", "#ffb74d", "#81c784", "#f06292", "#a1887f", "#64b5f6", "#ba68c8"]
   };
   const palette = paletteByTheme[selectedTheme] || paletteByTheme.default;
+  const ganttPanel = document.getElementById("ganttPanel");
+  const fullscreenBtn = document.getElementById("ganttFullscreenBtn");
   const groups = [...new Set(tasks.map((t) => t.colorGroup || t.project || "未分组"))];
   const colorMap = {};
   groups.forEach((g, i) => {
@@ -150,6 +152,44 @@
   };
   const milestoneColor = palette[Math.max(0, palette.length - 1)] || "#c62828";
   const nowTs = Date.now();
+
+  function isFullscreenActive() {
+    return document.fullscreenElement === ganttPanel
+      || document.webkitFullscreenElement === ganttPanel
+      || document.mozFullScreenElement === ganttPanel
+      || document.msFullscreenElement === ganttPanel;
+  }
+
+  function updateFullscreenButtonText() {
+    if (!fullscreenBtn) return;
+    fullscreenBtn.textContent = isFullscreenActive() ? "退出全屏" : "全屏";
+  }
+
+  function toggleGanttFullscreen() {
+    if (!ganttPanel) return;
+    if (isFullscreenActive()) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+      return;
+    }
+
+    if (ganttPanel.requestFullscreen) {
+      ganttPanel.requestFullscreen();
+    } else if (ganttPanel.webkitRequestFullscreen) {
+      ganttPanel.webkitRequestFullscreen();
+    } else if (ganttPanel.mozRequestFullScreen) {
+      ganttPanel.mozRequestFullScreen();
+    } else if (ganttPanel.msRequestFullscreen) {
+      ganttPanel.msRequestFullscreen();
+    }
+  }
 
   function barHeightForRow(rowType) {
     return rowType === "project" ? 36 : 24;
@@ -446,6 +486,10 @@
             borderWidth: 1
           }
         },
+        brush: {
+          type: ["lineX", "clear"],
+          title: { lineX: "横向刷选", clear: "清除刷选" }
+        },
         restore: { title: "还原" },
         dataView: {
           title: "数据视图",
@@ -459,7 +503,7 @@
           buttonTextColor: "#ffffff",
           optionToContent: function () {
             var taskList = (window.GANTT_DATA && window.GANTT_DATA.tasks) || [];
-            var cols    = ["#", "任务名", "项目", "开始日期", "结束日期", "周期(天)", "进度", "负责人", "说明"];
+            var cols = ["#", "任务名", "项目", "开始日期", "结束日期", "周期(天)", "进度", "负责人", "说明"];
             var html = '<div class="data-view-surface' + (dark ? ' data-view-dark' : '') + '">';
             html += '<div class="data-view-head">';
             html += '<h3 class="data-view-title">数据预览</h3>';
@@ -472,8 +516,8 @@
             html += '</tr></thead><tbody>';
             taskList.forEach(function (t, i) {
               var pct = t.progress != null ? Math.round(t.progress * 100) + "%" : "—";
-              var sd  = t.startISO ? new Date(t.startISO).toLocaleDateString("zh-CN") : "—";
-              var ed  = t.endISO  ? new Date(t.endISO).toLocaleDateString("zh-CN")  : "—";
+              var sd = t.startISO ? new Date(t.startISO).toLocaleDateString("zh-CN") : "—";
+              var ed = t.endISO ? new Date(t.endISO).toLocaleDateString("zh-CN") : "—";
               var desc = escapeHtml(t.description || "—");
               html += '<tr>';
               html += '<td style="text-align:center;color:' + (dark ? '#94a3b8' : '#64748b') + ';">' + (i + 1) + '</td>';
@@ -508,6 +552,20 @@
           title: "下载 HTML",
           icon: "path://M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z",
           onclick: function () { exportHTML(); }
+        },
+        myFitAll: {
+          show: true,
+          title: "适配全部",
+          icon: "path://M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
+          onclick: function () {
+            gantt.dispatchAction({ type: "dataZoom", start: 0, end: 100 });
+          }
+        },
+        myFullscreen: {
+          show: true,
+          title: "全屏显示",
+          icon: "path://M3 3h7v2H5v5H3V3zm18 0v7h-2V5h-5V3h7zM3 21v-7h2v5h5v2H3zm18-7v7h-7v-2h5v-5h2z",
+          onclick: function () { toggleGanttFullscreen(); }
         }
       }
     },
@@ -716,6 +774,17 @@
 
   gantt.setOption(chartOption);
 
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener("click", toggleGanttFullscreen);
+  }
+  ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"].forEach(function (evt) {
+    document.addEventListener(evt, function () {
+      updateFullscreenButtonText();
+      setTimeout(function () { gantt.resize(); }, 120);
+    });
+  });
+  updateFullscreenButtonText();
+
   /* ── 导出 SVG ────────────────────────────────────────── */
   function exportSVG() {
     var host = document.getElementById("gantt");
@@ -778,7 +847,7 @@
     ]).then(function (results) {
       // Sanitize: replace </script → <\/script so embedded sources cannot close
       // the outer <script> block in the generated HTML file.
-      var chartSrc   = results[0].replace(/<\/script/gi, "<\\/script");
+      var chartSrc = results[0].replace(/<\/script/gi, "<\\/script");
       var echartsSrc = results[1].replace(/<\/script/gi, "<\\/script");
       var data = JSON.stringify(window.GANTT_DATA, null, 2);
 

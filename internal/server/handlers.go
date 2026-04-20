@@ -3,6 +3,7 @@ package server
 
 import (
 	"io/fs"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,7 @@ import (
 	chartgantt "gantt/internal/charts/gantt"
 	"gantt/internal/data"
 	"gantt/internal/model"
+	"gantt/internal/viz"
 )
 
 const demoCSV = `Project,Task,StartDate,EndDate,Description,Milestone,MilestoneDate,PlanStartDate,PlanEndDate,Owner
@@ -22,15 +24,45 @@ Website,Integration,2026-04-27,2026-05-02,Integrate FE and BE,Integration Comple
 Website,Launch,2026-05-03,2026-05-05,Release to production,Go Live,2026-05-05,2026-05-02,2026-05-04,Eric
 `
 
+const vizDemoCSV = `Category,Month,Revenue,Cost,Profit,Share,Source,Target,LinkValue,NodeID,ParentID,NodeValue,ScatterX,ScatterY,ScatterSize
+Cloud,2026-01,120,72,48,28,,,,Cloud,,,12,12.5,28.4,18
+Cloud,2026-02,132,79,53,30,,,,Cloud,,,13,13.1,29.1,20
+Cloud,2026-03,145,84,61,31,,,,Cloud,,,15,14.2,31.6,22
+Security,2026-01,98,58,40,22,,,,Security,,,11,10.5,21.4,14
+Security,2026-02,103,61,42,23,,,,Security,,,11.5,11.2,22.3,16
+Security,2026-03,111,66,45,24,,,,Security,,,12.2,11.8,23.1,18
+AI,2026-01,86,49,37,18,,,,AI,,,10.2,9.8,18.4,12
+AI,2026-02,95,53,42,20,,,,AI,,,11.0,10.4,19.7,14
+AI,2026-03,108,60,48,22,,,,AI,,,11.8,11.3,21.8,16
+Data,2026-01,73,44,29,14,,,,Data,,,8.5,8.1,15.7,10
+Data,2026-02,80,47,33,15,,,,Data,,,9.1,8.8,16.9,12
+Data,2026-03,89,52,37,16,,,,Data,,,9.7,9.5,17.8,14
+,,,,,,Cloud,Security,36,,,,,,
+,,,,,,Cloud,AI,28,,,,,,
+,,,,,,Cloud,Data,18,,,,,,
+,,,,,,Security,AI,22,,,,,,
+,,,,,,Security,Data,19,,,,,,
+,,,,,,AI,Data,15,,,,,,
+,,,,,,,,,Platform,,100,,,
+,,,,,,,,,Cloud,Platform,40,,,
+,,,,,,,,,Security,Platform,25,,,
+,,,,,,,,,AI,Platform,20,,,
+,,,,,,,,,Data,Platform,15,,,
+`
+
 type handlers struct {
 	assets fs.FS
 }
 
-func (h *handlers) home(c *gin.Context) {
+func (h *handlers) entry(c *gin.Context) {
+	c.HTML(200, "entry.tmpl", gin.H{"Title": "图形工具入口"})
+}
+
+func (h *handlers) ganttHome(c *gin.Context) {
 	c.HTML(200, "index.tmpl", gin.H{"Title": "Gantt - Go + Gin + ECharts"})
 }
 
-func (h *handlers) demo(c *gin.Context) {
+func (h *handlers) ganttDemo(c *gin.Context) {
 	dataset, err := data.ParseCSV("demo.csv", strings.NewReader(demoCSV))
 	if err != nil {
 		c.HTML(200, "index.tmpl", gin.H{"Title": "Gantt - Go + Gin + ECharts", "Error": err.Error()})
@@ -40,11 +72,11 @@ func (h *handlers) demo(c *gin.Context) {
 	renderMapper(c, dataset, "")
 }
 
-func (h *handlers) clear(c *gin.Context) {
+func (h *handlers) ganttClear(c *gin.Context) {
 	c.HTML(200, "index.tmpl", gin.H{"Title": "Gantt - Go + Gin + ECharts"})
 }
 
-func (h *handlers) upload(c *gin.Context) {
+func (h *handlers) ganttUpload(c *gin.Context) {
 	fileHeader, err := c.FormFile("data_file")
 	if err != nil {
 		c.HTML(200, "index.tmpl", gin.H{"Title": "Gantt - Go + Gin + ECharts", "Error": "请选择要上传的 CSV 或 XLSX 文件。"})
@@ -59,7 +91,7 @@ func (h *handlers) upload(c *gin.Context) {
 	renderMapper(c, dataset, "")
 }
 
-func (h *handlers) chart(c *gin.Context) {
+func (h *handlers) ganttChart(c *gin.Context) {
 	datasetID := c.PostForm("dataset_id")
 	dataset, ok := data.Load(datasetID)
 	if !ok {
@@ -122,4 +154,99 @@ func (h *handlers) chart(c *gin.Context) {
 	}
 
 	renderWorkspace(c, dataset, cfg, opts, ganttResult.Tasks, ganttResult.Stats, "")
+}
+
+func (h *handlers) vizHome(c *gin.Context) {
+	c.HTML(200, "viz.tmpl", gin.H{
+		"Title":     "通用图形 - Go + Gin + ECharts",
+		"VizDefs":   viz.Definitions(),
+		"VizConfig": viz.ToMap(viz.Normalize(viz.Config{})),
+	})
+}
+
+func (h *handlers) vizDemo(c *gin.Context) {
+	dataset, err := data.ParseCSV("viz-demo.csv", strings.NewReader(vizDemoCSV))
+	if err != nil {
+		c.HTML(200, "viz.tmpl", gin.H{"Title": "通用图形 - Go + Gin + ECharts", "Error": err.Error()})
+		return
+	}
+	data.Store(dataset)
+	renderVizMapper(c, dataset, viz.Config{}, "")
+}
+
+func (h *handlers) vizClear(c *gin.Context) {
+	c.HTML(200, "viz.tmpl", gin.H{
+		"Title":     "通用图形 - Go + Gin + ECharts",
+		"VizDefs":   viz.Definitions(),
+		"VizConfig": viz.ToMap(viz.Normalize(viz.Config{})),
+	})
+}
+
+func (h *handlers) vizUpload(c *gin.Context) {
+	fileHeader, err := c.FormFile("data_file")
+	if err != nil {
+		c.HTML(200, "viz.tmpl", gin.H{"Title": "通用图形 - Go + Gin + ECharts", "Error": "请选择要上传的 CSV 或 XLSX 文件。"})
+		return
+	}
+	dataset, err := data.ParseUploadedFile(fileHeader)
+	if err != nil {
+		c.HTML(200, "viz.tmpl", gin.H{"Title": "通用图形 - Go + Gin + ECharts", "Error": err.Error()})
+		return
+	}
+	data.Store(dataset)
+	renderVizMapper(c, dataset, viz.Config{}, "")
+}
+
+func (h *handlers) vizChart(c *gin.Context) {
+	datasetID := c.PostForm("dataset_id")
+	dataset, ok := data.Load(datasetID)
+	if !ok {
+		c.HTML(200, "viz.tmpl", gin.H{"Title": "通用图形 - Go + Gin + ECharts", "Error": "数据已过期，请重新上传文件。", "VizDefs": viz.Definitions(), "VizConfig": viz.ToMap(viz.Normalize(viz.Config{}))})
+		return
+	}
+
+	vizCfg := viz.Normalize(viz.Config{
+		ChartKind:   strings.TrimSpace(c.PostForm("chart_kind")),
+		Title:       strings.TrimSpace(c.PostForm("title_text")),
+		SubTitle:    strings.TrimSpace(c.PostForm("subtitle_text")),
+		Theme:       strings.TrimSpace(c.PostForm("chart_theme")),
+		SeriesName:  strings.TrimSpace(c.PostForm("series_name")),
+		Series2Name: strings.TrimSpace(c.PostForm("series2_name")),
+		Series3Name: strings.TrimSpace(c.PostForm("series3_name")),
+		YMetricCount: func() int {
+			v := strings.TrimSpace(c.PostForm("y_metric_count"))
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return 0
+			}
+			return n
+		}(),
+		XCol:            c.PostForm("x_col"),
+		YCol:            c.PostForm("y_col"),
+		Y2Col:           c.PostForm("y2_col"),
+		Y3Col:           c.PostForm("y3_col"),
+		YExtraCols:      c.PostFormArray("y_extra_cols"),
+		NameCol:         c.PostForm("name_col"),
+		ValueCol:        c.PostForm("value_col"),
+		Value2Col:       c.PostForm("value2_col"),
+		SizeCol:         c.PostForm("size_col"),
+		SmoothLine:      c.PostForm("smooth_line") == "on",
+		SortMode:        strings.TrimSpace(c.PostForm("sort_mode")),
+		AggregateByName: c.PostForm("aggregate_by_name") == "on",
+		GaugeMode:       strings.TrimSpace(c.PostForm("gauge_mode")),
+		SourceCol:       c.PostForm("source_col"),
+		TargetCol:       c.PostForm("target_col"),
+		LinkValueCol:    c.PostForm("link_value_col"),
+		NodeIDCol:       c.PostForm("node_id_col"),
+		ParentIDCol:     c.PostForm("parent_id_col"),
+		NodeValueCol:    c.PostForm("node_value_col"),
+	})
+
+	payload, err := viz.Build(dataset, vizCfg)
+	if err != nil {
+		renderVizMapper(c, dataset, vizCfg, err.Error())
+		return
+	}
+
+	renderVizChart(c, dataset, vizCfg, payload, "")
 }
